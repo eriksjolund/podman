@@ -446,7 +446,7 @@ func (r *ConmonOCIRuntime) startExec(c *Container, sessionID string, options *Ex
 	if val := os.Getenv("LISTEN_FDS"); val != "" {
 			fds, err := strconv.Atoi(val)
 			if err != nil {
-				return fmt.Errorf("converting LISTEN_FDS=%s: %w", val, err)
+				return nil, nil, errors.Wrapf(err, "converting LISTEN_FDS=%s: %w", val)
 			}
 			preserveListenFDs = uint(fds)
 	}
