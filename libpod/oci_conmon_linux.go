@@ -1048,21 +1048,17 @@ func (r *ConmonOCIRuntime) createOCIContainer(ctr *Container, restoreOptions *Co
 	}
 
 	// Pass down the LISTEN_* environment (see #10443).
-	preserveFDs := ctr.config.PreserveFDs
+	preserveListenFDs := 0
 	if val := os.Getenv("LISTEN_FDS"); val != "" {
-		if ctr.config.PreserveFDs > 0 {
-			logrus.Warnf("Ignoring LISTEN_FDS to preserve custom user-specified FDs")
-		} else {
 			fds, err := strconv.Atoi(val)
 			if err != nil {
 				return fmt.Errorf("converting LISTEN_FDS=%s: %w", val, err)
 			}
-			preserveFDs = uint(fds)
-		}
+			preserveListenFDs = uint(fds)
 	}
 
-	if preserveFDs > 0 {
-		args = append(args, formatRuntimeOpts("--preserve-fds", fmt.Sprintf("%d", preserveFDs))...)
+	if ctr.config.PreserveFDs > 0 {
+		args = append(args, formatRuntimeOpts("--preserve-fds", fmt.Sprintf("%d", ctr.config.PreserveFDs))...)
 	}
 
 	if restoreOptions != nil {
@@ -1118,8 +1114,8 @@ func (r *ConmonOCIRuntime) createOCIContainer(ctr *Container, restoreOptions *Co
 	conmonEnv := r.configureConmonEnv(ctr, runtimeDir)
 
 	var filesToClose []*os.File
-	if preserveFDs > 0 {
-		for fd := 3; fd < int(3+preserveFDs); fd++ {
+	if ((preserveListenFDs+ctr.config.PreserveFDs) > 0) {
+		for fd := 3; fd < int(3+preserveListenFDs+ctr.config.PreserveFDs); fd++ {
 			f := os.NewFile(uintptr(fd), fmt.Sprintf("fd-%d", fd))
 			filesToClose = append(filesToClose, f)
 			cmd.ExtraFiles = append(cmd.ExtraFiles, f)
@@ -1128,8 +1124,8 @@ func (r *ConmonOCIRuntime) createOCIContainer(ctr *Container, restoreOptions *Co
 
 	cmd.Env = r.conmonEnv
 	// we don't want to step on users fds they asked to preserve
-	// Since 0-2 are used for stdio, start the fds we pass in at preserveFDs+3
-	cmd.Env = append(cmd.Env, fmt.Sprintf("_OCI_SYNCPIPE=%d", preserveFDs+3), fmt.Sprintf("_OCI_STARTPIPE=%d", preserveFDs+4))
+	// Since 0-2 are used for stdio, start the fds we pass in at preserveListenFDs+ctr.config.PreserveFDs+3
+	cmd.Env = append(cmd.Env, fmt.Sprintf("_OCI_SYNCPIPE=%d", preserveListenFDs+ctr.config.PreserveFDs+3), fmt.Sprintf("_OCI_STARTPIPE=%d", preserveListenFDs+ctr.config.PreserveFDs+4))
 	cmd.Env = append(cmd.Env, conmonEnv...)
 	cmd.ExtraFiles = append(cmd.ExtraFiles, childSyncPipe, childStartPipe)
 
