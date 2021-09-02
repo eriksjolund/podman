@@ -442,7 +442,7 @@ func (r *ConmonOCIRuntime) startExec(c *Container, sessionID string, options *Ex
 	conmonEnv := r.configureConmonEnv(c, runtimeDir)
 
 	var filesToClose []*os.File
-	preserveListenFDs := 0
+	preserveListenFDs := uint(0)
 	if val := os.Getenv("LISTEN_FDS"); val != "" {
 			fds, err := strconv.Atoi(val)
 			if err != nil {

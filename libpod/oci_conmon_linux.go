@@ -1048,7 +1048,7 @@ func (r *ConmonOCIRuntime) createOCIContainer(ctr *Container, restoreOptions *Co
 	}
 
 	// Pass down the LISTEN_* environment (see #10443).
-	preserveListenFDs := 0
+	preserveListenFDs := uint(0)
 	if val := os.Getenv("LISTEN_FDS"); val != "" {
 			fds, err := strconv.Atoi(val)
 			if err != nil {
