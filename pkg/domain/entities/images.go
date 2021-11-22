@@ -329,9 +329,9 @@ type ImageScpOptions struct {
 	Save ImageSaveOptions
 	// Load options used for the second half of the scp operation
 	Load ImageLoadOptions
-	// Rootless determines whether we are loading locally from root storage to rootless storage
-	Rootless bool
-	// User is used in conjunction with Rootless to determine which user to use to obtain the uid
+	// Transfer determines whether we are transferring an image locally
+	Transfer bool
+	// User is used in conjunction with Transfer to determine if a valid user was given to save from/load into
 	User string
 }
 

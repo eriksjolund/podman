@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	urlP "net/url"
 	"os"
+	"os/exec"
+	"os/user"
 	"strconv"
 	"strings"
 
@@ -28,8 +30,12 @@ import (
 var (
 	saveScpDescription = `Securely copy an image from one host to another.`
 	imageScpCommand    = &cobra.Command{
-		Use:               "scp [options] IMAGE [HOST::]",
-		Annotations:       map[string]string{registry.EngineMode: registry.ABIMode},
+		Use: "scp [options] IMAGE [HOST::]",
+		Annotations: map[string]string{
+			registry.UnshareNSRequired: "",
+			registry.ParentNSRequired:  "",
+			registry.EngineMode:        registry.ABIMode,
+		},
 		Long:              saveScpDescription,
 		Short:             "securely copy images",
 		RunE:              scp,
@@ -40,7 +46,8 @@ var (
 )
 
 var (
-	scpOpts entities.ImageScpOptions
+	parentFlags []string
+	scpOpts     entities.ImageScpOptions
 )
 
 func init() {
@@ -61,6 +68,20 @@ func scp(cmd *cobra.Command, args []string) (finalErr error) {
 		// TODO add tag support for images
 		err error
 	)
+	for i, val := range os.Args {
+		if val == "image" {
+			break
+		} else if i == 0 {
+			continue
+		} else if strings.Contains(val, "CIRRUS") {
+			continue
+		}
+		parentFlags = append(parentFlags, val)
+	}
+	podman, err := os.Executable()
+	if err != nil {
+		return err
+	}
 	if scpOpts.Save.Quiet { // set quiet for both load and save
 		scpOpts.Load.Quiet = true
 	}
@@ -68,9 +89,17 @@ func scp(cmd *cobra.Command, args []string) (finalErr error) {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
-
 	scpOpts.Save.Output = f.Name()
+	scpOpts.Save.Format = "oci-archive"
+	err = os.Remove(f.Name()) // remove the file and simply use its name so podman creates the file upon save. avoids umask errors
+	if err != nil {
+		return err
+	}
+	_, err = os.Open(scpOpts.Save.Output)
+	if err == nil {
+		return errors.New("temporary file already exists. If this issue persists please clear out /var/tmp")
+	}
+
 	scpOpts.Load.Input = scpOpts.Save.Output
 	if err := parse.ValidateFileName(saveOpts.Output); err != nil {
 		return err
@@ -79,6 +108,7 @@ func scp(cmd *cobra.Command, args []string) (finalErr error) {
 	if err != nil {
 		return errors.Wrapf(err, "could not make config")
 	}
+
 	abiEng, err := registry.NewImageEngine(cmd, args) // abi native engine
 	if err != nil {
 		return err
@@ -108,57 +138,77 @@ func scp(cmd *cobra.Command, args []string) (finalErr error) {
 			fmt.Println(rep)
 			break
 		}
-		report, err := abiEng.Load(context.Background(), scpOpts.Load)
+		err = execLoad(podman)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Loaded image(s): " + strings.Join(report.Names, ","))
 	case scpOpts.ToRemote: // remote host load
-		scpOpts.Save.Format = "oci-archive"
-		abiErr := abiEng.Save(context.Background(), scpOpts.SourceImageName, []string{}, scpOpts.Save) // save the image locally before loading it on remote, local, or ssh
-		if abiErr != nil {
-			errors.Wrapf(abiErr, "could not save image as specified")
+		err = execSave(podman)
+		if err != nil {
+			return err
 		}
 		rep, err := loadToRemote(scpOpts.Save.Output, "", scpOpts.URI[0], scpOpts.Iden[0])
 		if err != nil {
 			return err
 		}
 		fmt.Println(rep)
-	// TODO: Add podman remote support
-	default: // else native load
-		scpOpts.Save.Format = "oci-archive"
-		_, err := os.Open(scpOpts.Save.Output)
+		err = os.Remove(scpOpts.Save.Output)
 		if err != nil {
 			return err
 		}
+	// TODO: Add podman remote support
+	default: // else native load
 		if scpOpts.Tag != "" {
 			return errors.Wrapf(define.ErrInvalidArg, "Renaming of an image is currently not supported")
 		}
-		scpOpts.Save.Format = "oci-archive"
-		abiErr := abiEng.Save(context.Background(), scpOpts.SourceImageName, []string{}, scpOpts.Save) // save the image locally before loading it on remote, local, or ssh
-		if abiErr != nil {
-			return errors.Wrapf(abiErr, "could not save image as specified")
-		}
-		if !rootless.IsRootless() && scpOpts.Rootless {
-			if scpOpts.User == "" {
-				scpOpts.User = os.Getenv("SUDO_USER")
+		if scpOpts.Transfer { // if we ae tranferring between users...
+			var u *user.User
+			if scpOpts.User != "" {
+				scpUser := os.Getenv("USER")
+				if !rootless.IsRootless() {
+					scpUser = os.Getenv("SUDO_USER")
+				}
+				half := strings.Split(scpOpts.User, ":")[0] //if we are given a uid:gid we need to convert to a username before checking if the user is proper
+				_, err := strconv.Atoi(half)
+				if err == nil {
+					u, err = user.LookupId(half)
+				} else {
+					u, err = user.Lookup(scpOpts.User)
+				}
+				if err != nil {
+					return err
+				}
+				if scpUser != "" && scpUser != u.Username && u.Username != "root" {
+					return errors.New("the given user must be the default rootless user or root")
+				}
+			} else if scpOpts.User == "" {
+				scpOpts.User = os.Getenv("USER")
+				if !rootless.IsRootless() {
+					scpOpts.User = os.Getenv("SUDO_USER")
+				}
 				if scpOpts.User == "" {
-					return errors.New("could not obtain root user, make sure the environmental variable SUDO_USER is set, and that this command is being run as root")
+					return errors.New("could not obtain user, make sure the environmental variable $USER is set")
 				}
 			}
-			err := abiEng.Transfer(context.Background(), scpOpts)
+			err := abiEng.Transfer(context.Background(), scpOpts, parentFlags)
 			if err != nil {
 				return err
 			}
-		} else {
-			rep, err := abiEng.Load(context.Background(), scpOpts.Load)
+		} else { // else do the default (save and load, no affect)
+			err = execSave(podman)
 			if err != nil {
 				return err
 			}
-			fmt.Println("Loaded image(s): " + strings.Join(rep.Names, ","))
+			err = execLoad(podman)
+			if err != nil {
+				return err
+			}
+			err = os.Remove(scpOpts.Save.Output)
+			if err != nil {
+				return err
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -276,12 +326,14 @@ func parseArgs(args []string, cfg *config.Config) (map[string]config.Destination
 	cliConnections := []string{}
 	switch len(args) {
 	case 1:
-		if strings.Contains(args[0], "localhost") {
-			if strings.Split(args[0], "@")[0] != "root" {
-				return nil, errors.Wrapf(define.ErrInvalidArg, "cannot transfer images from any user besides root using sudo")
+		if strings.Contains(args[0], "@localhost") { // image transfer between users
+			scpOpts.User = strings.Split(args[0], "@")[0]
+			scpOpts.Transfer = true
+			if len(strings.Split(args[0], "::")) > 1 {
+				scpOpts.SourceImageName = strings.Split(args[0], "::")[1]
+			} else {
+				return nil, errors.New("no image provided")
 			}
-			scpOpts.Rootless = true
-			scpOpts.SourceImageName = strings.Split(args[0], "::")[1]
 		} else if strings.Contains(args[0], "::") {
 			scpOpts.FromRemote = true
 			cliConnections = append(cliConnections, args[0])
@@ -293,16 +345,16 @@ func parseArgs(args []string, cfg *config.Config) (map[string]config.Destination
 			scpOpts.SourceImageName = args[0]
 		}
 	case 2:
-		if strings.Contains(args[0], "localhost") || strings.Contains(args[1], "localhost") { // only supporting root to local using sudo at the moment
-			if strings.Split(args[0], "@")[0] != "root" {
-				return nil, errors.Wrapf(define.ErrInvalidArg, "currently, transferring images to a user account is not supported")
-			}
-			if len(strings.Split(args[0], "::")) > 1 {
-				scpOpts.Rootless = true
-				scpOpts.User = strings.Split(args[1], "@")[0]
+		if strings.Contains(args[0], "@localhost") || strings.Contains(args[1], "@localhost") { // image transfer between users
+			scpOpts.Transfer = true
+			if len(strings.Split(args[0], "::")) > 1 && len(strings.Split(args[0], "::")[1]) > 0 { // first argument contains image and therefore is our user
+				scpOpts.User = strings.Split(args[0], "@")[0]
 				scpOpts.SourceImageName = strings.Split(args[0], "::")[1]
+			} else if len(strings.Split(args[1], "::")) > 1 && len(strings.Split(args[1], "::")[1]) > 0 { // second argument contains image and therefore is our user
+				scpOpts.User = strings.Split(args[1], "@")[0]
+				scpOpts.SourceImageName = strings.Split(args[1], "::")[1]
 			} else {
-				return nil, errors.Wrapf(define.ErrInvalidArg, "currently, you cannot rename images during the transfer or transfer them to a user account")
+				return nil, errors.New("no image provided")
 			}
 		} else if strings.Contains(args[0], "::") {
 			if !(strings.Contains(args[1], "::")) && remoteArgLength(args[0], 1) == 0 { // if an image is specified, this mean we are loading to our client
@@ -378,4 +430,120 @@ func parseArgs(args []string, cfg *config.Config) (map[string]config.Destination
 		scpOpts.Iden = append(scpOpts.Iden, iden)
 	}
 	return serv, nil
+}
+
+// execLoad executes the podman load command given the podman binary
+func execLoad(podman string) error {
+	var loadCommand []string
+	if scpOpts.Save.Quiet || scpOpts.Load.Quiet {
+		loadCommand = []string{"load", "-q", "--input", scpOpts.Save.Output}
+	} else {
+		loadCommand = []string{"load", "--input", scpOpts.Save.Output}
+	}
+	if rootless.IsRootless() {
+		cmd := exec.Command(podman)
+		cmd.Args = append(cmd.Args, parentFlags...)
+		cmd.Args = append(cmd.Args, loadCommand...)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing load command")
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	machinectl, err := exec.LookPath("machinectl")
+	if err != nil {
+		cmd := exec.Command("su", "-l", "root", "--command")
+		fullCommand := podman
+		for _, val := range parentFlags {
+			fullCommand += (" " + val)
+		}
+		for _, val := range loadCommand {
+			fullCommand += (" " + val)
+		}
+		cmd.Args = append(cmd.Args, fullCommand)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing load command su")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+	} else {
+		cmd := exec.Command(machinectl, "shell", "-q", "root@.host")
+		cmd.Args = append(cmd.Args, podman)
+		cmd.Args = append(cmd.Args, parentFlags...)
+		cmd.Args = append(cmd.Args, loadCommand...)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing load command machinectl")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// execSave executes the podman save command given the podman binary
+func execSave(podman string) error {
+	var saveCommand []string
+	if scpOpts.Save.Quiet || scpOpts.Load.Quiet {
+		saveCommand = []string{"save", "-q", "--output", scpOpts.Save.Output, scpOpts.SourceImageName}
+	} else {
+		saveCommand = []string{"save", "--output", scpOpts.Save.Output, scpOpts.SourceImageName}
+	}
+	if rootless.IsRootless() {
+		cmd := exec.Command(podman)
+		cmd.Args = append(cmd.Args, parentFlags...)
+		cmd.Args = append(cmd.Args, saveCommand...)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing save command")
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	machinectl, err := exec.LookPath("machinectl")
+	if err != nil {
+		cmd := exec.Command("su", "-l", "root", "--command")
+		fullCommand := podman
+		for _, val := range parentFlags {
+			fullCommand += (" " + val)
+		}
+		for _, val := range saveCommand {
+			fullCommand += (" " + val)
+		}
+		cmd.Args = append(cmd.Args, fullCommand)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing save command su")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+	} else {
+		cmd := exec.Command(machinectl, "shell", "-q", "root@.host")
+		cmd.Args = append(cmd.Args, podman)
+		cmd.Args = append(cmd.Args, parentFlags...)
+		cmd.Args = append(cmd.Args, saveCommand...)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing save command machinectl")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

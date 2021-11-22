@@ -29,7 +29,6 @@ var _ = Describe("podman image scp", func() {
 			panic(err)
 		}
 		os.Setenv("CONTAINERS_CONF", conf.Name())
-
 		tempdir, err = CreateTempDirInTempDir()
 		if err != nil {
 			os.Exit(1)
@@ -56,30 +55,63 @@ var _ = Describe("podman image scp", func() {
 		if IsRemote() {
 			Skip("this test is only for non-remote")
 		}
+
 		scp := podmanTest.Podman([]string{"image", "scp", "-q", ALPINE})
 		scp.WaitWithDefaultTimeout()
 		Expect(scp).To(Exit(0))
 	})
 
-	It("podman image scp root to rootless transfer", func() {
-		SkipIfNotRootless("this is a rootless only test, transferring from root to rootless using PodmanAsUser")
+	/*
+		AS A NOTE: these transfer test are only executed in specific circumstances
+		not because the feature only works in those circumstances but because the testing
+		suite only works on those circumstances. reaching into alternate users in the testing suite
+		is nearly impossible so this just tests for syntax and sanity checks.
+	*/
+
+	It("podman image scp image transfer syntax 1", func() {
+		SkipIfNotFedora()
+		SkipIfInContainer("alternate UIDs not known, transfer will fail")
+		SkipIfRootless("the tests fail when rootless due to permission issues in the image cache being passed")
 		if IsRemote() {
 			Skip("this test is only for non-remote")
 		}
-		env := os.Environ()
-		img := podmanTest.PodmanAsUser([]string{"image", "pull", ALPINE}, 0, 0, "", env) // pull image to root
-		img.WaitWithDefaultTimeout()
-		Expect(img).To(Exit(0))
-		scp := podmanTest.PodmanAsUser([]string{"image", "scp", "root@localhost::" + ALPINE, "1000:1000@localhost::"}, 0, 0, "", env) //transfer from root to rootless (us)
+		scp := podmanTest.Podman([]string{"image", "scp", "1000:1000@localhost::" + ALPINE})
 		scp.WaitWithDefaultTimeout()
 		Expect(scp).To(Exit(0))
+	})
 
-		list := podmanTest.Podman([]string{"image", "list"}) // our image should now contain alpine loaded in from root
-		list.WaitWithDefaultTimeout()
-		Expect(list).To(Exit(0))
-		Expect(list.OutputToStringArray()).To(ContainElement(HavePrefix("quay.io/libpod/alpine")))
+	It("podman image scp image transfer syntax 2", func() { // syntax tests need to be separate due to chowning of image cache error
+		SkipIfNotFedora()
+		SkipIfInContainer("alternate UIDs not known, transfer will fail")
+		SkipIfRootless("the tests fail when rootless due to permission issues in the image cache being passed")
+		if IsRemote() {
+			Skip("this test is only for non-remote")
+		}
+		scp := podmanTest.Podman([]string{"image", "scp", "1000:1000@localhost::" + ALPINE, "root@localhost::"})
+		scp.WaitWithDefaultTimeout()
+		Expect(scp).To(Exit(0))
+	})
 
-		scp = podmanTest.PodmanAsUser([]string{"image", "scp", "root@localhost::" + ALPINE}, 0, 0, "", env) //transfer from root to rootless (us)
+	It("podman image scp image transfer syntax 3", func() {
+		SkipIfNotFedora()
+		SkipIfInContainer("alternate UIDs not known, transfer will fail")
+		SkipIfRootless("the tests fail when rootless due to permission issues in the image cache being passed")
+		if IsRemote() {
+			Skip("this test is only for non-remote")
+		}
+		scp := podmanTest.Podman([]string{"image", "scp", "root@localhost::" + ALPINE})
+		scp.WaitWithDefaultTimeout()
+		Expect(scp).To(Exit(0))
+	})
+
+	It("podman image scp image transfer syntax 4", func() {
+		SkipIfNotFedora()
+		SkipIfInContainer("alternate UIDs not known, transfer will fail")
+		SkipIfRootless("the tests fail when rootless due to permission issues in the image cache being passed")
+		if IsRemote() {
+			Skip("this test is only for non-remote")
+		}
+		scp := podmanTest.Podman([]string{"image", "scp", "root@localhost::" + ALPINE, "1000:1000@localhost::"})
 		scp.WaitWithDefaultTimeout()
 		Expect(scp).To(Exit(0))
 	})
@@ -115,7 +147,7 @@ var _ = Describe("podman image scp", func() {
 			},
 		))
 
-		scp := podmanTest.Podman([]string{"image", "scp", ALPINE, "QA::"})
+		scp := podmanTest.PodmanAsUser([]string{"image", "scp", ALPINE, "QA::"}, 0, 0, "", os.Environ())
 		scp.Wait(45)
 		// exit with error because we cannot make an actual ssh connection
 		// This tests that the input we are given is validated and prepared correctly

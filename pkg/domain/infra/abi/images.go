@@ -334,46 +334,124 @@ func (ir *ImageEngine) Push(ctx context.Context, source string, destination stri
 	return pushError
 }
 
-// Transfer moves images from root to rootless storage so the user specified in the scp call can access and use the image modified by root
-func (ir *ImageEngine) Transfer(ctx context.Context, scpOpts entities.ImageScpOptions) error {
+// Transfer moves images between root and rootless storage so the user specified in the scp call can access and use the image modified by root
+func (ir *ImageEngine) Transfer(ctx context.Context, scpOpts entities.ImageScpOptions, parentFlags []string) error {
 	if scpOpts.User == "" {
 		return errors.Wrapf(define.ErrInvalidArg, "you must define a user when transferring from root to rootless storage")
 	}
-	var u *user.User
-	scpOpts.User = strings.Split(scpOpts.User, ":")[0] // split in case provided with uid:gid
-	_, err := strconv.Atoi(scpOpts.User)
-	if err != nil {
-		u, err = user.Lookup(scpOpts.User)
-		if err != nil {
-			return err
-		}
-	} else {
-		u, err = user.LookupId(scpOpts.User)
-		if err != nil {
-			return err
-		}
-	}
-	uid, err := strconv.Atoi(u.Uid)
-	if err != nil {
-		return err
-	}
-	gid, err := strconv.Atoi(u.Gid)
-	if err != nil {
-		return err
-	}
-	err = os.Chown(scpOpts.Save.Output, uid, gid) // chown the output because was created by root so we need to give th euser read access
-	if err != nil {
-		return err
-	}
-
 	podman, err := os.Executable()
 	if err != nil {
 		return err
 	}
+	saveCommand := []string{"save", "--output", scpOpts.Save.Output, scpOpts.SourceImageName}
+	loadCommand := []string{"load", "--input", scpOpts.Save.Output}
+	if rootless.IsRootless() {
+		var cmd *exec.Cmd
+		if scpOpts.User == "root" {
+			cmd = exec.Command("sudo", podman)
+			cmd.Args = append(cmd.Args, parentFlags...)
+			cmd.Args = append(cmd.Args, saveCommand...)
+		} else {
+			cmd = exec.Command(podman)
+			cmd.Args = append(cmd.Args, parentFlags...)
+			cmd.Args = append(cmd.Args, saveCommand...)
+		}
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing save command")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+
+		if scpOpts.User == "root" {
+			cmd = exec.Command(podman)
+			cmd.Args = append(cmd.Args, parentFlags...)
+			cmd.Args = append(cmd.Args, loadCommand...)
+		} else {
+			cmd = exec.Command("sudo", podman)
+			cmd.Args = append(cmd.Args, parentFlags...)
+			cmd.Args = append(cmd.Args, loadCommand...)
+		}
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing load command")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+	// if executing using sudo, the above approach will not work, default to using machinectl or su as necessary.
+	// the approach using sudo is preferable and more straightforward. There is no reason for using sudo in these situations
+	// since the feature is meant to transfer from root to rootless an vice versa without explicit sudo evocaiton.
+	var uSave *user.User
+	var uLoad *user.User
+	scpOpts.User = strings.Split(scpOpts.User, ":")[0] // split in case provided with uid:gid
+	_, err = strconv.Atoi(scpOpts.User)
+	if err != nil {
+		uSave, err = user.Lookup(scpOpts.User)
+		if err != nil {
+			return err
+		}
+	} else {
+		uSave, err = user.LookupId(scpOpts.User)
+		if err != nil {
+			return err
+		}
+	}
+	if uSave.Name != "root" {
+		uLoad, err = user.LookupId("0")
+		if err != nil {
+			return err
+		}
+	} else {
+		uString := os.Getenv("SUDO_USER")
+		if uString == "" {
+			uLoad, err = user.LookupId("1000")
+			if err != nil {
+				return err
+			}
+		} else {
+			uLoad, err = user.Lookup(uString)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	var cmd *exec.Cmd
 	machinectl, err := exec.LookPath("machinectl")
 	if err != nil {
 		logrus.Warn("defaulting to su since machinectl is not available, su will fail if no user session is available")
-		cmd := exec.Command("su", "-l", u.Username, "--command", podman+" --log-level="+logrus.GetLevel().String()+" --cgroup-manager=cgroupfs load --input="+scpOpts.Save.Output) // load the new image to the rootless storage
+		cmd = exec.Command("su", "-l", uSave.Username, "--command") //podman+" --log-level="+logrus.GetLevel().String()+" --cgroup-manager=cgroupfs save --output="+scpOpts.Save.Output) // load the new image to the rootless storage
+		fullCommand := podman
+		for _, val := range parentFlags {
+			fullCommand += (" " + val)
+		}
+		for _, val := range saveCommand {
+			fullCommand += (" " + val)
+		}
+		cmd.Args = append(cmd.Args, fullCommand)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing save command su")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+		cmd = exec.Command("su", "-l", uLoad.Username, "--command") //, podman+" --log-level="+logrus.GetLevel().String()+" --cgroup-manager=cgroupfs load --input="+scpOpts.Save.Output) // load the new image to the rootless storage
+		fullCommand = podman
+		for _, val := range parentFlags {
+			fullCommand += (" " + val)
+		}
+		for _, val := range loadCommand {
+			fullCommand += (" " + val)
+		}
+		cmd.Args = append(cmd.Args, fullCommand)
+		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
 		logrus.Debug("Executing load command su")
@@ -382,7 +460,31 @@ func (ir *ImageEngine) Transfer(ctx context.Context, scpOpts entities.ImageScpOp
 			return err
 		}
 	} else {
-		cmd := exec.Command(machinectl, "shell", "-q", u.Username+"@.host", podman, "--log-level="+logrus.GetLevel().String(), "--cgroup-manager=cgroupfs", "load", "--input", scpOpts.Save.Output) // load the new image to the rootless storage
+		if uSave.Uid == "0" {
+			cmd = exec.Command("sudo", machinectl, "shell", "-q", uSave.Username+"@.host")
+		} else {
+			cmd = exec.Command(machinectl, "shell", "-q", uSave.Username+"@.host")
+		}
+		cmd.Args = append(cmd.Args, podman)
+		cmd.Args = append(cmd.Args, parentFlags...)
+		cmd.Args = append(cmd.Args, saveCommand...)
+		cmd.Env = os.Environ()
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
+		logrus.Debug("Executing save command machinectl")
+		err = cmd.Run()
+		if err != nil {
+			return err
+		}
+		if uLoad.Uid == "0" {
+			cmd = exec.Command("sudo", machinectl, "shell", "-q", uLoad.Username+"@.host")
+		} else {
+			cmd = exec.Command(machinectl, "shell", "-q", uLoad.Username+"@.host")
+		}
+		cmd.Args = append(cmd.Args, podman)
+		cmd.Args = append(cmd.Args, parentFlags...)
+		cmd.Args = append(cmd.Args, loadCommand...)
+		cmd.Env = os.Environ()
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
 		logrus.Debug("Executing load command machinectl")
@@ -391,7 +493,6 @@ func (ir *ImageEngine) Transfer(ctx context.Context, scpOpts entities.ImageScpOp
 			return err
 		}
 	}
-
 	return nil
 }
 
