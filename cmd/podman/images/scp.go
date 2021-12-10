@@ -3,14 +3,14 @@ package images
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+        "io/ioutil"
 	urlP "net/url"
 	"os"
 	"os/exec"
 	"os/user"
 	"strconv"
 	"strings"
-
+        "time"
 	"github.com/containers/common/pkg/config"
 	"github.com/containers/podman/v3/cmd/podman/common"
 	"github.com/containers/podman/v3/cmd/podman/parse"
@@ -99,8 +99,8 @@ func scp(cmd *cobra.Command, args []string) (finalErr error) {
 	if err == nil {
 		return errors.New("temporary file already exists. If this issue persists please clear out /var/tmp")
 	}
-
-	scpOpts.Load.Input = scpOpts.Save.Output
+        time.Sleep(5 * time.Second)
+     	scpOpts.Load.Input = scpOpts.Save.Output
 	if err := parse.ValidateFileName(saveOpts.Output); err != nil {
 		return err
 	}
