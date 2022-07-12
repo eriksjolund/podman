@@ -195,7 +195,7 @@ Print the version
 
 #### **--volumepath**=*value*
 
-Volume directory where builtin volume information is stored (default: "/var/lib/containers/storage/volumes" for UID 0, "$HOME/.local/share/containers/storage/volumes" for other users). Default volume path can be overridden in `containers.conf`.
+Volume directory where built-in volume information is stored (default: "/var/lib/containers/storage/volumes" for UID 0, "$HOME/.local/share/containers/storage/volumes" for other users). Default volume path can be overridden in `containers.conf`.
 
 ## Environment Variables
 
@@ -357,11 +357,11 @@ the exit codes follow the `chroot` standard, see below:
 
 **containers.conf** (`/usr/share/containers/containers.conf`, `/etc/containers/containers.conf`, `$HOME/.config/containers/containers.conf`)
 
-Podman has builtin defaults for command line options. These defaults can be overridden using the containers.conf configuration files.
+Podman has built-in defaults for command line options. These defaults can be overridden using the containers.conf configuration files.
 
-Distributions ship the `/usr/share/containers/containers.conf` file with their default settings. Administrators can override fields in this file by creating the `/etc/containers/containers.conf` file.  Users can further modify defaults by creating the `$HOME/.config/containers/containers.conf` file. Podman merges its builtin defaults with the specified fields from these files, if they exist. Fields specified in the users file override the administrator's file, which overrides the distribution's file, which override the built-in defaults.
+Distributions ship the `/usr/share/containers/containers.conf` file with their default settings. Administrators can override fields in this file by creating the `/etc/containers/containers.conf` file.  Users can further modify defaults by creating the `$HOME/.config/containers/containers.conf` file. Podman merges its built-in defaults with the specified fields from these files, if they exist. Fields specified in the users file override the administrator's file, which overrides the distribution's file, which override the built-in defaults.
 
-Podman uses builtin defaults if no containers.conf file is found.
+Podman uses built-in defaults if no containers.conf file is found.
 
 If the **CONTAINERS_CONF** environment variable is set, then its value is used for the containers.conf file rather than the default.
 

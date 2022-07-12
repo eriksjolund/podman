@@ -83,7 +83,7 @@ func init() {
 	if !registry.IsRemote() {
 		defInfraImage = containerConfig.Engine.InfraImage
 	}
-	flags.StringVar(&infraImage, infraImageFlagName, defInfraImage, "Image to use to override builtin infra container")
+	flags.StringVar(&infraImage, infraImageFlagName, defInfraImage, "Image to use to override built-in infra container")
 	_ = createCommand.RegisterFlagCompletionFunc(infraImageFlagName, common.AutocompleteImages)
 
 	podIDFileFlagName := "pod-id-file"

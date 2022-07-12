@@ -184,11 +184,11 @@ the exit codes follow the `chroot` standard, see below:
 
 **containers.conf** (`$HOME/.config/containers/containers.conf`)
 
-Podman has builtin defaults for command line options. These defaults can be overridden using the containers.conf configuration files.
+Podman has built-in defaults for command line options. These defaults can be overridden using the containers.conf configuration files.
 
-Users can modify defaults by creating the `$HOME/.config/containers/containers.conf` file. Podman merges its builtin defaults with the specified fields from this file, if it exists. Fields specified in the users file override the built-in defaults.
+Users can modify defaults by creating the `$HOME/.config/containers/containers.conf` file. Podman merges its built-in defaults with the specified fields from this file, if it exists. Fields specified in the users file override the built-in defaults.
 
-Podman uses builtin defaults if no containers.conf file is found.
+Podman uses built-in defaults if no containers.conf file is found.
 
 ## SEE ALSO
 **[podman(1)](podman.1.md)**, **[podman-system-service(1)](podman-system-service.1.md)**, **[containers.conf(5)](https://github.com/containers/common/blob/main/docs/containers.conf.5.md)**
