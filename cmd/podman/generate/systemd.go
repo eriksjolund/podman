@@ -49,7 +49,7 @@ var (
 		Args:              cobra.ExactArgs(1),
 		ValidArgsFunction: common.AutocompleteContainersAndPods,
 		Example: `podman generate systemd CTR
-  podman generate systemd --new --time 10 CTR
+  podman generate systemd --new --name --stop-timeout 15 CTR
   podman generate systemd --files --name POD`,
 	}
 )
