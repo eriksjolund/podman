@@ -49,6 +49,16 @@ Using `--userns=auto` when starting new containers does not work as long as any 
   - *uid*=UID: override the UID inside the container that is used to map the current user to.
   - *gid*=GID: override the GID inside the container that is used to map the current user to.
 
+  The username of the regular user on the host will be set in /etc/passwd when all of these conditions are met:
+
+  - The *uid* and *gid* options are not set
+  - The file _/etc/passwd_ in the container image does not contain any user with same UID as the regular user on the host
+
+  The groupname of the regular user on the host will be set in /etc/group when all of these conditions are met:
+
+  - The *uid* and *gid* options are not set
+  - The file _/etc/group_ in the container image does not contain any group with same GID as the regular user on the host
+
 **nomap**: creates a user namespace where the current rootless user's UID:GID are not mapped into the container. This option is not allowed for containers created by the root user.
 
 **ns:**_namespace_: run the <<container|pod>> in the given existing user namespace.
