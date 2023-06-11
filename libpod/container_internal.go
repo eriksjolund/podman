@@ -1233,16 +1233,16 @@ func (c *Container) start() error {
 	c.state.State = define.ContainerStateRunning
 
 	if c.config.SdNotifyMode != define.SdNotifyModeIgnore {
-		payload := fmt.Sprintf("MAINPID=%d", c.state.ConmonPID)
-		if c.config.SdNotifyMode == define.SdNotifyModeConmon {
-			payload += "\n"
-			payload += daemon.SdNotifyReady
-		}
+		payload := daemon.SdNotifyReady
 		if err := notifyproxy.SendMessage(c.config.SdNotifySocket, payload); err != nil {
 			logrus.Errorf("Notifying systemd of Conmon PID: %s", err.Error())
 		} else {
 			logrus.Debugf("Notify sent successfully")
 		}
+		// A racy solution that is just meant to be used as a proof-of-concept.
+		// Sleep long enough so that notify-mainpid has time
+		// to notify the systemd daemon MAINPID=$conmonPID
+		time.Sleep(5 * time.Second)
 	}
 
 	// Check if healthcheck is not nil and --no-healthcheck option is not set.

@@ -1,0 +1,6 @@
+FROM registry.fedoraproject.org/fedora-minimal AS builder
+RUN microdnf install -y g++ libstdc++-static glibc-static systemd-devel
+COPY notifymainpid.cpp /notifymainpid.cpp
+RUN g++ -std=c++20 /notifymainpid.cpp -o /notify-mainpid -lsystemd
+FROM registry.fedoraproject.org/fedora-minimal
+COPY --from=builder /notify-mainpid /
