@@ -46,7 +46,7 @@ func restService(flags *pflag.FlagSet, cfg *entities.PodmanConfig, opts entities
 			return fmt.Errorf("cannot retrieve file descriptors from systemd: %w", err)
 		}
 		if len(listeners) != 1 {
-			return fmt.Errorf("wrong number of file descriptors for socket activation protocol (%d != 1)", len(listeners))
+			return errors.New("podman system service does not support more than one listening socket for the API service")
 		}
 		listener = listeners[0]
 		// note that activation.Listeners() returns nil when it cannot listen on the fd (i.e. udp connection)
