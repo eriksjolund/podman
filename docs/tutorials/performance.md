@@ -226,3 +226,47 @@ $ podman build -v $HOME/dnf_cache_f36:/var/cache/dnf:O -t cowsay $HOME/ctr
 ```
 
 The article [_Speeding up container image builds with Buildah_](https://www.redhat.com/sysadmin/speeding-container-buildah) by Dan Walsh provides more details.
+
+### Use a `.containerignore` file to exclude files from build context
+
+Create a `.containerignore` or `.dockerignore` file to specify which files and directories under the context directory should be ignored during the container image build.
+For details, see [`podman build`](https://docs.podman.io/en/stable/markdown/podman-build.1.html#containerignore-dockerignore).
+
+#### Example: Add file _.containerignore_ to speed up `podman build`
+
+1. Create a directory
+   ```
+   $ mkdir source
+   ```
+2. Create the file _source/Containerfile_ with the contents
+   ```
+   FROM registry.fedoraproject.org/fedora
+   COPY /file1 /file1
+   ```
+3. Create the file _source/file1_ with the contents
+   ```
+   hello
+   ```
+4. Create a 1 Gb file named _source/file2_. The file
+   content does not matter because the file is not used
+   in the Containerfile.
+   On Linux a file with size 1 Gb can be created with
+   ```
+   $ fallocate -l 1G source/file2
+   ```
+5. Build the container
+   ```
+   $ podman build --no-cache source/
+   ```
+6. Create the file _source/.containerignore_ with the contents
+   ```
+   /file2
+   ```
+7. Build the container again
+   ```
+   $ podman build --no-cache source/
+   ```
+
+`podman build` should run faster in step 7 than in step 5.
+To make a fair benchmark comparison, run the commands two times
+to avoid different file system caching effects.
