@@ -1,0 +1,301 @@
+{
+  "options": {
+    "bind-nonrecursive": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": "Do not set up a recursive bind mount. By default it is recursive."
+    },
+    "bind-propagation": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "See also mount(2)."
+    },
+    "chown": {
+      "alternative_name": [
+        "U"
+      ],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": "Recursively change the owner and group of the source volume based on the UID and GID of the container."
+    },
+    "destination": {
+      "alternative_name": [
+        "dst",
+        "target"
+      ],
+      "supported": [
+        "artifact",
+        "bind",
+        "devpts",
+        "glob",
+        "image",
+        "ramfs",
+        "tmpfs",
+        "volume"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "Mount destination spec. When the destination is specified, the files and directories matching the glob on the base file name on the destination directory are mounted. The option `type=glob,src=/foo*,destination=/tmp/bar` tells container engines to mount host files matching /foo* to the /tmp/bar/ directory in the container."
+    },
+    "digest": {
+      "alternative_name": [],
+      "supported": [
+        "artifact"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "If the artifact source contains multiple blobs a digest can be specified to only mount the one specific blob with the digest."
+    },
+    "gid": {
+      "alternative_name": [],
+      "supported": [
+        "devpts"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "numeric GID of the file owner"
+    },
+    "idmap": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob",
+        "volume"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": "*true* or *false* (default if unspecified: *false*).  If true, create an idmapped mount to the target user namespace in the container. The idmap option is only supported by Podman in rootful mode."
+    },
+    "max": {
+      "alternative_name": [],
+      "supported": [
+        "devpts"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "maximum number of PTYs"
+    },
+    "mode": {
+      "alternative_name": [],
+      "supported": [
+        "devpts"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "octal permission mask for the file (default: 600)."
+    },
+    "no-dereference": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": "do not dereference symlinks but copy the link source into the mount destination."
+    },
+    "notmpcopyup": {
+      "alternative_name": [],
+      "supported": [
+        "tmpfs",
+        "ramfs"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": "Disable copying files from the image to the tmpfs/ramfs."
+    },
+    "ptmxmode": {
+      "alternative_name": [],
+      "supported": [
+        "devpts"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": ""
+    },
+    "shared": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": false,
+      "docs": "The same as `bind-propagation=shared`."
+    },
+    "rshared": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": false,
+      "docs": "The same as `bind-propagation=rshared`."
+    },
+    "rprivate": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": false,
+      "docs": "The same as `bind-propagation=rprivate`."
+    },
+    "slave": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": false,
+      "docs": "The same as `bind-propagation=slave`."
+    },
+    "rslave": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": false,
+      "docs": "The same as `bind-propagation=rslave`."
+    },
+    "relabel": {
+      "alternative_name": [],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": ""
+    },
+    "readonly": {
+      "alternative_name": ["ro"],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": ""
+    },
+    "readwrite": {
+      "alternative_name": ["rw"],
+      "supported": [
+        "bind",
+        "glob"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": ""
+    },
+    "source": {
+      "alternative_name": [
+        "src"
+      ],
+      "supported": [
+        "artifact",
+        "bind",
+        "glob",
+        "image",
+        "volume"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "mount source spec"
+    },
+    "subpath": {
+      "alternative_name": [],
+      "supported": [
+        "image",
+        "volume"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": ""
+    },
+    "title": {
+      "alternative_name": [],
+      "supported": [
+        "artifact"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "If the artifact source contains multiple blobs a title can be set which is compared against `org.opencontainers.image.title` annotation."
+    },
+    "tmpcopyup": {
+      "alternative_name": [],
+      "supported": [
+        "tmpfs",
+        "ramfs"
+      ],
+      "argcount_0": true,
+      "argcount_1": true,
+      "docs": "Enable copyup from the image directory at the same location to the tmpfs/ramfs. Used by default."
+    },
+    "tmpfs-mode": {
+      "alternative_name": [],
+      "supported": [
+        "tmpfs",
+        "ramfs"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "Octal file mode of the tmpfs/ramfs (e.g. 700 or 0700.)."
+    },
+    "tmpfs-size": {
+      "alternative_name": [],
+      "supported": [
+        "tmpfs",
+        "ramfs"
+      ],
+      "argcount_0": false,
+      "argcount_1": true,
+      "docs": "Size of the tmpfs/ramfs mount, in bytes. Unlimited by default in Linux."
+    }
+  },
+  "types": {
+    "artifact": {
+      "description": "artifact documentation."
+    },
+    "bind": {
+      "description": "bind documentation."
+    },
+    "devpts": {
+      "description": "devpts documentation."
+    },
+    "glob": {
+      "description": "globs documentation."
+    },
+    "image": {
+      "description": "image documentation."
+    },
+    "ramfs": {
+      "description": "ramfs documentation."
+    },
+    "tmpfs": {
+      "description": "tmpfs documentation."
+    },
+    "volume": {
+      "description": "volume documentation."
+    }
+  }
+}

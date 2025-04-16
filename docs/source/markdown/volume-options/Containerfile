@@ -1,0 +1,4 @@
+FROM docker.io/library/fedora
+RUN dnf install -y jq python3
+COPY generate-docs.py /generate-docs.py
+CMD ["python3", "/generate-docs.py"]
