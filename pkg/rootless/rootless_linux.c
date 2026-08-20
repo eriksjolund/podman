@@ -459,7 +459,7 @@ do_preexec_hooks_dir (const char *dir, char **argv, int argc)
       int ret;
 
       ret = snprintf (path, PATH_MAX, "%s/%s", dir, fname);
-      if (ret == PATH_MAX)
+      if (ret >= PATH_MAX)
         {
           fprintf (stderr, "internal error: path too long\n");
           exit (EXIT_FAILURE);
@@ -698,7 +698,7 @@ open_namespace (int pid_to_join, const char *ns_file)
   int ret;
 
   ret = snprintf (ns_path, PATH_MAX, "/proc/%d/ns/%s", pid_to_join, ns_file);
-  if (ret == PATH_MAX)
+  if (ret >= PATH_MAX)
     {
       fprintf (stderr, "internal error: namespace path too long\n");
       return -1;
